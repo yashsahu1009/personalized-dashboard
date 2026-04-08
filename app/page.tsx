@@ -42,7 +42,7 @@ export default function Dashboard() {
       ]);
       const movies = await fetchMovies(searchQuery || "avengers", page);
 
-      const formattedNews = (news || []).map((n, i) => ({
+       const formattedNews = (news || []).map((n: any, i: number) => ({
         id: n.url || `news-${page}-${i}`,
         title: n.title,
         description: n.description || "No description",

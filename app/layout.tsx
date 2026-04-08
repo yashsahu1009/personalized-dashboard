@@ -24,14 +24,13 @@ export default function RootLayout({
     <html lang="en">
       <body className="flex h-screen bg-gray-100 dark:bg-gray-900 text-black dark:text-white">
         
-        <Sidebar darkMode={darkMode} />
+        <Sidebar />
 
         <div className="flex-1 flex flex-col overflow-hidden">
           <Header
-            darkMode={darkMode}
-            setDarkMode={setDarkMode}
-            search=""
-            setSearch={() => {}}
+            
+          
+     
           />
 
           <div className="p-6 overflow-y-auto">
