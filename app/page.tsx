@@ -1,65 +1,145 @@
-import Image from "next/image";
+ "use client";
 
-export default function Home() {
+import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
+import ContentCard from "@/components/ContentCard";
+import Loader from "@/components/Loader";
+import { fetchNews, fetchMovies, fetchSocialMediaPosts } from "@/services/api";
+
+type Item = {
+  id: string;
+  title: string;
+  description: string;
+  image: string;
+  type: "news" | "movie" | "social";
+};
+
+export default function Dashboard() {
+  const searchParams = useSearchParams();
+  const searchQuery = searchParams.get("search") || "";
+
+  const [allData, setAllData] = useState<Item[]>([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [visibleType, setVisibleType] = useState<"all" | "news" | "movie" | "social">("all");
+  const loaderRef = useRef<HTMLDivElement | null>(null);
+
+  // Reset data on search change
+  useEffect(() => {
+    setAllData([]);
+    setPage(1);
+  }, [searchQuery]);
+
+  // Fetch data
+  const loadData = async () => {
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      const [news, social] = await Promise.all([
+        fetchNews(searchQuery || "technology AND India"),
+        fetchSocialMediaPosts(searchQuery || "tech"),
+      ]);
+      const movies = await fetchMovies(searchQuery || "avengers", page);
+
+      const formattedNews = (news || []).map((n, i) => ({
+        id: n.url || `news-${page}-${i}`,
+        title: n.title,
+        description: n.description || "No description",
+        image: n.urlToImage || "/placeholder.png",
+        type: "news" as const,
+      }));
+
+      const formattedSocial = (social || []).map((s, i) => ({
+        id: s.id || `social-${page}-${i}`,
+        title: s.user,
+        description: s.content,
+        image: "/placeholder.png",
+        type: "social" as const,
+      }));
+
+      const formattedMovies = (movies || []).map((m, i) => ({
+        id: m.imdbID || `movie-${page}-${i}`,
+        title: m.Title,
+        description: `Year: ${m.Year}`,
+        image: m.Poster && m.Poster !== "N/A" ? m.Poster : "/placeholder.png",
+        type: "movie" as const,
+      }));
+
+      const combined = [...formattedNews, ...formattedMovies, ...formattedSocial];
+
+      // Merge and remove duplicates
+      setAllData((prev) =>
+        combined.concat(prev).filter((item, index, self) => index === self.findIndex((t) => t.id === item.id))
+      );
+
+    } catch (err) {
+      console.error("Error loading data:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadData();
+  }, [page, searchQuery]);
+
+  // Infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading) setPage((prev) => prev + 1);
+      },
+      { threshold: 1 }
+    );
+
+    if (loaderRef.current) observer.observe(loaderRef.current);
+    return () => observer.disconnect();
+  }, [loading]);
+
+  // Filtered data based on tab
+  const visibleData = visibleType === "all" ? allData : allData.filter((d) => d.type === visibleType);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <>
+      <h2 className="text-2xl sm:text-3xl font-semibold mb-4 sm:mb-6">
+        {searchQuery ? `🔍 Results for "${searchQuery}"` : "👋 Welcome Back"}
+      </h2>
+
+      {/* CATEGORY TABS */}
+      <div className="flex flex-wrap gap-2 sm:gap-4 mb-4 sm:mb-6">
+        {["all", "news", "movie", "social"].map((t) => (
+          <button
+            key={t}
+            className={`px-3 sm:px-4 py-2 rounded-lg text-sm sm:text-base ${
+              visibleType === t ? "bg-blue-500 text-white" : "bg-white/10 text-gray-300"
+            }`}
+            onClick={() => setVisibleType(t as any)}
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            {t === "all" ? "Overview" : t.charAt(0).toUpperCase() + t.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {/* CONTENT GRID */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        {visibleData
+          .filter((item) => item && item.title)
+          .map((item, i) => (
+            <ContentCard
+              key={item.id || i}
+              title={item.title || "No Title"}
+              description={item.description || "No description"}
+              image={item.image || "/placeholder.png"}
+              type={item.type || "news"}
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+          ))}
+      </div>
+
+      {/* LOADER */}
+      <div ref={loaderRef} className="flex justify-center items-center py-6">
+        {loading && <Loader />}
+      </div>
+    </>
   );
 }
